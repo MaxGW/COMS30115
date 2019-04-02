@@ -35,6 +35,7 @@ void VertexShader( vec4& v, ivec2& p);
 void VertexShaderP( vec4& v, Pixel& p);
 void Interpolate(ivec2 a, ivec2 b, vector<ivec2>& result);
 void DrawLineSDL(screen* screen, ivec2 a, ivec2 b, vec3 color);
+void DrawLineSDLPixel(screen* screen, Pixel a, Pixel b, vec3 color);
 void DrawPolygonEdges(screen* screen,  vector<vec4>& vertices);
 void updateRotationMatrix(float cumYaw);
 void ComputePolygonRows(vector<ivec2>& vertexPixels,vector<ivec2>& leftPixels,vector<ivec2>& rightPixels);
@@ -125,15 +126,34 @@ void VertexShaderPixel( vec4& v, Pixel& p){
 
 }
 
+// //fucntion draws a line between two given points in the given colour
+// void DrawLineSDL(screen* screen, ivec2 a, ivec2 b, vec3 color){
+//   ivec2 delta = glm::abs( a - b );
+//   int pixels = glm::max( delta.x, delta.y ) + 1;
+//   vector<ivec2> line( pixels );
+//   Interpolate( a, b, line );
+//
+//   for(uint32_t i = 0; i < line.size(); i++){
+//     PutPixelSDL(screen, line[i].x, line[i].y, color);
+//   }
+// }
+
 //fucntion draws a line between two given points in the given colour
-void DrawLineSDL(screen* screen, ivec2 a, ivec2 b, vec3 color){
-  ivec2 delta = glm::abs( a - b );
-  int pixels = glm::max( delta.x, delta.y ) + 1;
-  vector<ivec2> line( pixels );
-  Interpolate( a, b, line );
+void DrawLineSDLPixel(screen* screen, Pixel a, Pixel b, vec3 color){
+  int deltaX = glm::abs( a.x - b.x );
+  int deltaY = glm::abs( a.y - b.y );
+
+  int pixels = glm::max( deltaX, deltaY ) + 1;
+  vector<Pixel> line( pixels );
+  InterpolatePixel( a, b, line );
 
   for(uint32_t i = 0; i < line.size(); i++){
-    PutPixelSDL(screen, line[i].x, line[i].y, color);
+    float zinv = line[i].zinv;
+    int x = line[i].x;
+    int y = line[i].y;
+    if(x > 0 && y > 0 && x < SCREEN_WIDTH && y < SCREEN_HEIGHT && zinv > depthBuffer[y][x]){
+      PutPixelSDL(screen, line[i].x, line[i].y, color);
+    }
   }
 }
 
@@ -166,7 +186,7 @@ void InterpolatePixel(Pixel a, Pixel b, vector<Pixel>& result){
     result[i].y = round(current.y);
     result[i].zinv = current.zinv;
     //setting depth buffer value
-    depthBuffer[result[i].x][result[i].y] = current.zinv;
+    depthBuffer[result[i].y][result[i].x] = current.zinv;
     current.x += xStep;
     current.y += yStep;
     current.zinv += zStep;
@@ -323,11 +343,13 @@ void ComputePolygonRowsPixel(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixe
       //if larger  than right pixel value, must be an edge, replace value
       if(line[y].x > rightPixels[offset].x){
         rightPixels[offset].x = line[y].x;
-
+        rightPixels[offset].zinv = line[y].zinv;
       }
       //if smaller than the current left pixel value, must be an edge, replace value
       if(line[y].x < leftPixels[offset].x){
         leftPixels[offset].x = line[y].x;
+        leftPixels[offset].zinv = line[y].zinv;
+
       }
     }
   }
@@ -355,20 +377,12 @@ void ComputePolygonRowsPixel(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixe
 
 //function draws row by row between leftPixels and rightPixels
 void DrawPolygonRowsPixel(screen* screen,  vector<Pixel>& leftPixels,  vector<Pixel>& rightPixels){
-
   if(rightPixels.size() != leftPixels.size()){
     cout << "leftPixels rightPixels array size doesn't match";
   }
   else{
     for(uint i = 0; i < leftPixels.size(); i++){
-      //how many pixels between left and right
-      int n = rightPixels[i].x - leftPixels[i].x + 1;
-      // call PutPixelSDL for every pixel to be drawn
-      for(int j = 0; j < n; j++){
-        if(leftPixels[i].zinv > depthBuffer[leftPixels[i].x][leftPixels[i].y]){
-          PutPixelSDL(screen, (leftPixels[i].x + j), leftPixels[i].y, currentColour);
-        }
-      }
+      DrawLineSDLPixel(screen, leftPixels[i], rightPixels[i], currentColour);
     }
   }
 }
@@ -404,14 +418,14 @@ void DrawPolygon(screen* screen,  vector<vec4>& vertices){
   }
 
   int V = vertices.size();
-  vector<ivec2> vertexPixels( V );
+  vector<Pixel> vertexPixels( V );
   for( int i=0; i<V; ++i ){
-    VertexShader( vertices[i], vertexPixels[i] );
+    VertexShaderPixel( vertices[i], vertexPixels[i] );
   }
-  vector<ivec2> leftPixels;
-  vector<ivec2> rightPixels;
-  ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-  DrawPolygonRows(screen, leftPixels, rightPixels);
+  vector<Pixel> leftPixels;
+  vector<Pixel> rightPixels;
+  ComputePolygonRowsPixel( vertexPixels, leftPixels, rightPixels );
+  DrawPolygonRowsPixel(screen, leftPixels, rightPixels);
 
 }
 
