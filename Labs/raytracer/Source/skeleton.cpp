@@ -15,8 +15,8 @@ using glm::mat4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 600
-#define SCREEN_HEIGHT 600
+#define SCREEN_WIDTH 50
+#define SCREEN_HEIGHT 50
 #define FULLSCREEN_MODE false
 
 struct Intersection{
