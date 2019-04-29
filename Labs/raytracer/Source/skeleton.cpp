@@ -15,8 +15,8 @@ using glm::mat4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 50
-#define SCREEN_HEIGHT 50
+#define SCREEN_WIDTH 150
+#define SCREEN_HEIGHT 150
 #define FULLSCREEN_MODE false
 
 struct Intersection{
@@ -88,21 +88,23 @@ vec3 FindIntersection(Triangle triangle, vec4 d, vec4 s){
   //int detA = glm::determinant(A);
   //float tt = (b.x*A[0][0] + b.y*A[0][1] + b.z*A[0][2]) / detA;
 
-  /* mat3 tempA = A;
+/*
+//CRAMERS (doesnt work)
+  mat3 tempA = A;
 
   for(int i = 0; i<3; i++){
     tempA[i][0] = b[i];
   }
   float tt = glm::determinant(tempA) / glm::determinant(A);
 
-  cout << "b[i] = ("  << b[0] << ", " = v
-       << b[1] << ", "
-       << b[2] << ")" << "\n";
-  cout << "a[i] = ("  << tempA[0][0] << ", "
-       << tempA[1][0] << ", "
-       << tempA[2][0] << ")" << "\n";
-  cout << "Cramers tt = " << tt << "\n";
-  cout << "Inverse tt = "  << x.x << "\n";
+  // cout << "b[i] = ("  << b[0] << ", " = v
+  //      << b[1] << ", "
+  //      << b[2] << ")" << "\n";
+  // cout << "a[i] = ("  << tempA[0][0] << ", "
+  //      << tempA[1][0] << ", "
+  //      << tempA[2][0] << ")" << "\n";
+  // cout << "Cramers tt = " << tt << "\n";
+  // cout << "Inverse tt = "  << x.x << "\n";
 
   if(tt < 0){
     return vec3(-1,-1,-1);
@@ -122,15 +124,13 @@ bool ClosestIntersection(vec4 s, vec4 dir, const vector<Triangle>& triangles, In
   for(size_t i = 0; i<triangles.size(); i++){
     vec3 x = FindIntersection(triangles[i], dir, s);
 
-    /*if(x == vec3(-1,-1,-1)Intersection lightIntersection;)  vec3 colourTemp;{
+    if(x == vec3(-1,-1,-1)){
 
       printf("***\n");
-      cout << "(" << x.x << ", "
-           << x.y << ", "
-           << x.z << ")" << "\n";
+
       x = vec3(0,0,0);
       continue;
-    }*/
+    }
 
   //  printf("===\n");
 
