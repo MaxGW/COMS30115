@@ -19,6 +19,7 @@ SDL_Event event;
 #define SCREEN_HEIGHT 150
 #define FULLSCREEN_MODE false
 
+
 struct Intersection{
   vec4 position;
   float distance;
@@ -39,6 +40,7 @@ float yaw = 0.1;
 vec4 lightPos(0, -0.5, -0.7, 1.0);
 vec3 lightColour = 14.f * vec3(1,1,1);
 vec3 indirectLight =  0.5f* vec3 (1,1,1);
+float antiAliasingValue = 4;
 
 
 /* ----------------------------------------------------------------------------*/
@@ -238,25 +240,45 @@ void Draw(screen* screen){
   Intersection closestIntersection;
 
   for (int y=0; y<SCREEN_HEIGHT; y++){
-  //for (int y=50; y<53; y++){
+
     for(int x=0; x<SCREEN_WIDTH; x++){
-    //for(int x=50; x<53; x++){
+      vec3 cumColour = vec3(0,0,0);
 
-      //point defines the co-ordinate in the image plane
-      vec4 point = vec4(-(x-(SCREEN_WIDTH/2)), y-(SCREEN_HEIGHT/2), -focalLength, 1.0);
-      //storing directional vector from the camera position to centre of image
-      mat4 camToWorld = LookAt(vec3(cameraPos), vec3(0,0,0));
-      //update the point with camToWorld direction and set dir equal to vector from camPos to point
-      vec3 temp_dir = normalize(vec3((camToWorld*point) - cameraPos));
+      for(int j = 0; j < antiAliasingValue; j++){
+        for(int i=0; i< antiAliasingValue; i++){
 
-      vec4 dir(temp_dir.x, temp_dir.y, temp_dir.z, 1);
-      if(ClosestIntersection(cameraPos, dir, triangles, closestIntersection)){
-        vec3 colourTemp =  triangles[closestIntersection.triangleIndex].color;
-        colour = colourTemp * (DirectLight(closestIntersection) + indirectLight);
+
+          //point defines the co-ordinate in the image plane
+          vec4 point = vec4(-(x-(SCREEN_WIDTH/2)), y-(SCREEN_HEIGHT/2), -focalLength, 1.0);
+          float xOffset = (i - (antiAliasingValue / 2))/antiAliasingValue;
+          float yOffset = (j - (antiAliasingValue / 2))/antiAliasingValue;
+          float temppp = (i - (antiAliasingValue / 2));
+          // cout << temppp << "*\n";
+          // cout << "i = " << i << "j = " << j << "\n" << antiAliasingValue;
+          // cout << "x = " << xOffset << "y =" << yOffset;
+          vec4 offset = vec4(xOffset, yOffset, 0.f, 0.f);
+
+          //storing directional vector from the camera position to centre of image
+          mat4 camToWorld = LookAt(vec3(cameraPos), vec3(0,0,0));
+          //update the point with camToWorld direction and set dir equal to vector from camPos to point
+          vec3 temp_dir = normalize(vec3((camToWorld*(point+offset)) - cameraPos));
+
+          vec4 dir(temp_dir.x, temp_dir.y, temp_dir.z, 1);
+          //cout << dir.x << dir.y;
+
+          if(ClosestIntersection(cameraPos, dir, triangles, closestIntersection)){
+            vec3 colourTemp =  triangles[closestIntersection.triangleIndex].color;
+            colour = colourTemp * (DirectLight(closestIntersection) + indirectLight);
+          }
+          else{
+            colour = vec3(0,0,0);
+          }
+          cumColour += colour;
+        }
       }
-      else{
-        colour = vec3(0,0,0);
-      }
+
+      int aa = antiAliasingValue * antiAliasingValue;
+      colour = vec3(cumColour.x / aa, cumColour.y / aa, cumColour.z / aa);
       PutPixelSDL(screen, x, y, colour);
     }
   }
