@@ -32,9 +32,6 @@ struct Pixel{
 
 struct Vertex{
   vec4 position;
-  //vec4 normal;
-  //Carls initial reflectance was vec2
-  //vec3 reflectance;
 };
 
 /* ----------------------------------------------------------------------------*/
@@ -49,7 +46,6 @@ void updateRotationMatrix(float cumYaw);
 void ComputePolygonRows(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixels,vector<Pixel>& rightPixels);
 void DrawPolygonRows(screen* screen, vector<Pixel>& leftPixels, vector<Pixel>& rightPixels);
 void DrawPolygon(screen* screen,  vector<Vertex>& vertices);
-// void InterpolateP(Pixel a, Pixel b, vector<Pixel>& result);
 void VertexShader( Vertex& v, Pixel &p);
 
 /* ----------------------------------------------------------------------------*/
@@ -66,7 +62,7 @@ vector<ivec2> rightPixels();
 vec3 currentColour;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 //Lighting globals
-vec4 lightPos(0,-1,-0.7,1.0);
+vec4 lightPos(0,-0.5,-0.7,1.0);
 vec3 lightPower = 14.0f*vec3( 1, 1, 1 );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 vec4 currentNormal;
@@ -104,6 +100,7 @@ void VertexShader( Vertex &v, Pixel &p){
   p.x = f * pp.x * p.zinv + (SCREEN_WIDTH / 2);
   p.y = f * pp.y * p.zinv + (SCREEN_HEIGHT / 2);
   p.pos3D = v.position;
+
 }
 
 //fucntion draws a line between two given points in the given colour
@@ -126,16 +123,15 @@ void DrawLineSDL(screen* screen, Pixel a, Pixel b, vec3 color){
       //if zinv is larger than currently stored pixel, the point is closer
       if(zinv > depthBuffer[y][x]){
         //Distance from light to 3D position
-        vec3 tempR = vec3(lightPos) - vec3(pos3D);
-        float distance = glm::length(tempR);
-        double temp = 4 * M_PI * distance * distance;
-        float functionDenominator = 1 / temp;
+        vec3 posToLight = vec3(lightPos) - vec3(pos3D);
+        float distance = glm::length(posToLight);
+        float illuminationDenominator = 1 / ( 4 * M_PI * distance * distance);
         //find projection
         vec3 n = normalize(vec3(currentNormal));
-        vec3 r = normalize(tempR);
+        vec3 r = normalize(posToLight);
         float projection = glm::dot(n, r);
         //Direct illumination from omni light source
-        vec3 D = glm::max(projection, 0.f) * lightPower  * functionDenominator;
+        vec3 D = glm::max(projection, 0.f) * lightPower  * illuminationDenominator;
         //R = p*(D+N)
         vec3 illumination = currentColour * (currentReflectance * (D + indirectLightPowerPerArea));
         //update depthBuffer value
@@ -172,10 +168,6 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result){
   }
 }
 
-/* ----------------------------------------------------------------------------*/
-/* DRAWING THE STUFF                                                           */
-
-
 //fucntion receives array of projected vertices vertexPixels of a given shape
 //function interpolates between points, outputting furthest left and right pixels into arrays
 void ComputePolygonRows(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixels,vector<Pixel>& rightPixels){
@@ -192,25 +184,21 @@ void ComputePolygonRows(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixels,ve
     }
   }
 
-  //calulate number of rows
+  //calulate number of rows and resize
   int rows = maxY - minY + 1;
-  //resize arrays
   leftPixels.resize(rows);
   rightPixels.resize(rows);
-  // 3. Initialize the x-coordinates in leftPixels
-  //    to some really large value and the x-coordinates
-  //    in rightPixels to some really small value.
-  //  Set y co-ordinate in leftPixels and rightPixels array
+
+  //Initialise leftPixels to large x-values and rightPixels to small x-values
+  //Initialise y values
   for( int i=0; i<rows; ++i ){
     leftPixels[i].x  = numeric_limits<int>::max();
     leftPixels[i].y = minY + i;
     rightPixels[i].x = -numeric_limits<int>::max();
     rightPixels[i].y = minY + i;
   }
-  // 4. Loop through all edges of the polygon and use
-  //    linear interpolation to find the x-coordinate for
-  //    each row it occupies. Update the corresponding
-  //    values in rightPixels and leftPixels.
+
+  //Iterate through vertices updating leftPixels and rightPixels then Interpolate
   for(int i = 0; i < vertexNo; i++){
     //Find next vertex
     int j = (i+1)%vertexNo;
@@ -219,7 +207,6 @@ void ComputePolygonRows(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixels,ve
     difference.y = abs(vertexPixels[i].y - vertexPixels[j].y);
 
     //find number of rows between two vertices (different to ROWS)
-    //int intArraySize = abs(vertexPixels[indireci].y - vertexPixels[j].y) + 1;
     int intArraySize = glm::max(difference.x, difference.y) + 1;
 
     //interpolate between two projected vertices, filling results array
@@ -245,6 +232,11 @@ void ComputePolygonRows(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixels,ve
     }
   }
 }
+
+
+/* ----------------------------------------------------------------------------*/
+/* DRAWING THE STUFF                                                           */
+
 
 //function draws row by row between leftPixels and rightPixels
 void DrawPolygonRows(screen* screen,  vector<Pixel>& leftPixels,  vector<Pixel>& rightPixels){
@@ -345,9 +337,8 @@ bool Update()
         //__________________________________//
         /* Move camera left */
     	      case SDLK_LEFT:
-              cumYaw += yaw;
               updateRotationMatrix(yaw);
-
+              cumYaw += yaw;
               cameraPos = R * cameraPos;
     		    break;
         //__________________________________//

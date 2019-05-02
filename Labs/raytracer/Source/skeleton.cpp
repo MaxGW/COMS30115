@@ -42,6 +42,7 @@ vec4 lightPos(0, -0.5, -0.7, 1.0);
 vec3 lightColour = 14.f * vec3(1,1,1);
 vec3 indirectLight =  0.5f* vec3 (1,1,1);
 float antiAliasingValue = 4;
+bool negativeDistanceFlag = false;
 
 
 /* ----------------------------------------------------------------------------*/
@@ -51,6 +52,7 @@ bool Update();
 void Draw(screen* screen);
 vec3 FindIntersection(Triangle triangle, vec4 d, vec4 s);
 bool ClosestIntersection(vec4 s, vec4 dir, const vector<Triangle>& triangles, Intersection& closestIntersection);
+void updateRotationMatrix(float yaw);
 mat4 LookAt(vec3 from, vec3 to);
 
 int main( int argc, char* argv[] )
@@ -88,31 +90,16 @@ vec3 FindIntersection(Triangle triangle, vec4 d, vec4 s){
 
   mat3 A(vec3(-d), e1, e2);
 
-  //int detA = glm::determinant(A);
-  //float tt = (b.x*A[0][0] + b.y*A[0][1] + b.z*A[0][2]) / detA;
-
-/*
-//CRAMERS (doesnt work)
-  mat3 tempA = A;
-
-  for(int i = 0; i<3; i++){
-    tempA[i][0] = b[i];
-  }
-  float tt = glm::determinant(tempA) / glm::determinant(A);
-
-  // cout << "b[i] = ("  << b[0] << ", " = v
-  //      << b[1] << ", "
-  //      << b[2] << ")" << "\n";
-  // cout << "a[i] = ("  << tempA[0][0] << ", "
-  //      << tempA[1][0] << ", "
-  //      << tempA[2][0] << ")" << "\n";
-  // cout << "Cramers tt = " << tt << "\n";
-  // cout << "Inverse tt = "  << x.x << "\n";
-
-  if(tt < 0){
-    return vec3(-1,-1,-1);
-  }*/
-
+// //CRAMERS (not fully implemented)
+//   mat3 tempA = A;
+//   for(int i = 0; i<3; i++){
+//     tempA[0][i] = b[i];
+//   }
+//   float tt = glm::determinant(tempA) / glm::determinant(A);
+//   if(tt < 0){
+//     negativeDistanceFlag = true;
+//     return vec3(-1,-1,-1);
+//   }
 
   return inverse(A) * b;
 }
@@ -127,15 +114,12 @@ bool ClosestIntersection(vec4 s, vec4 dir, const vector<Triangle>& triangles, In
   for(size_t i = 0; i<triangles.size(); i++){
     vec3 x = FindIntersection(triangles[i], dir, s);
 
-    if(x == vec3(-1,-1,-1)){
-
-      printf("***\n");
-
-      x = vec3(0,0,0);
-      continue;
-    }
-
-  //  printf("===\n");
+    //Checks for Cramers rule (not fully implemented)
+    // if(negativeDistanceFlag){
+    //   printf("***\n");
+    //   negativeDistanceFlag = false;
+    //   skip;
+    // }
 
     //if valid intersection
     if( x.y >= 0 && x.z >= 0 && (x.y + x.z) <= 1 && x.x >= 0 ){
@@ -157,17 +141,12 @@ bool ClosestIntersection(vec4 s, vec4 dir, const vector<Triangle>& triangles, In
     closestIntersection.distance = closestX.x;
     closestIntersection.triangleIndex = closestIndex;
   }
-
   return isValidIntersection;
 }
 
 
-
-
 vec3 DirectLight(Intersection& i){
   Intersection lightIntersection;
-
-//  vec4 weight = float(0.01)*normalize(triangles[i.triangleIndex].normal);
 
   //adjust intersection point along direction from i to light by scalar
   vec4 weight = float(0.01)*((lightPos - i.position));
@@ -201,8 +180,7 @@ vec3 DirectLight(Intersection& i){
 }
 
 
-
-
+//Function calculates direction matrix between two given vec3 points
 mat4 LookAt(vec3 from, vec3 to){
   mat4 camToWorld;
 
@@ -232,6 +210,7 @@ mat4 LookAt(vec3 from, vec3 to){
   return camToWorld;
 }
 
+
 /*Place your drawing here*/
 void Draw(screen* screen){
   /* Clear buffer */
@@ -240,24 +219,24 @@ void Draw(screen* screen){
   vec3 colour;
   Intersection closestIntersection;
 
-  #pragma omp parallel for schedule (static,10)
+  //#pragma omp parallel for schedule (static,10)
   for (int y=0; y<SCREEN_HEIGHT; y++){
 
     for(int x=0; x<SCREEN_WIDTH; x++){
-      vec3 cumColour = vec3(0,0,0);
+      vec3 cumulativeColour = vec3(0,0,0);
 
+      //anti-aliasing
+      //calculate a pixel's value by including its (antiAliasingValue x antiAliasingValue) neighbours
       for(int j = 0; j < antiAliasingValue; j++){
         for(int i=0; i< antiAliasingValue; i++){
 
-
           //point defines the co-ordinate in the image plane
           vec4 point = vec4(-(x-(SCREEN_WIDTH/2)), y-(SCREEN_HEIGHT/2), -focalLength, 1.0);
-          float xOffset = (i - (antiAliasingValue / 2))/antiAliasingValue;
-          float yOffset = (j - (antiAliasingValue / 2))/antiAliasingValue;
-          float temppp = (i - (antiAliasingValue / 2));
-          // cout << temppp << "*\n";
-          // cout << "i = " << i << "j = " << j << "\n" << antiAliasingValue;
-          // cout << "x = " << xOffset << "y =" << yOffset;
+
+          //calculating offset variable
+          float xOffset = (i - (antiAliasingValue / 2))/(2*antiAliasingValue);
+          float yOffset = (j - (antiAliasingValue / 2))/(2*antiAliasingValue);
+          //offset vector to be added to 3D point co-ords to obtain points close
           vec4 offset = vec4(xOffset, yOffset, 0.f, 0.f);
 
           //storing directional vector from the camera position to centre of image
@@ -266,7 +245,6 @@ void Draw(screen* screen){
           vec3 temp_dir = normalize(vec3((camToWorld*(point+offset)) - cameraPos));
 
           vec4 dir(temp_dir.x, temp_dir.y, temp_dir.z, 1);
-          //cout << dir.x << dir.y;
 
           if(ClosestIntersection(cameraPos, dir, triangles, closestIntersection)){
             vec3 colourTemp =  triangles[closestIntersection.triangleIndex].color;
@@ -275,20 +253,29 @@ void Draw(screen* screen){
           else{
             colour = vec3(0,0,0);
           }
-          cumColour += colour;
+          //summing colour of central points and its neighbours for anti-aliasing
+          cumulativeColour += colour;
         }
       }
-
+      //find average colour of point and its neighbours
       int aa = antiAliasingValue * antiAliasingValue;
-      colour = vec3(cumColour.x / aa, cumColour.y / aa, cumColour.z / aa);
+      colour = vec3(cumulativeColour.x / aa, cumulativeColour.y / aa, cumulativeColour.z / aa);
+      //draw pixel
       PutPixelSDL(screen, x, y, colour);
     }
   }
 }
 
 
+//funtion updates global rotation matrix from a given yaw
+void updateRotationMatrix(float yaw){
+    R = mat4(cos(yaw) , 0, sin(yaw), 0,
+           0        , 1, 0       , 0,
+           -sin(yaw), 0, cos(yaw), 0,
+           0       , 0, 0      , 1);
+}
 
-/*Place updates of parameters here*/
+
 bool Update()
 {
   static int t = SDL_GetTicks();
@@ -323,25 +310,14 @@ bool Update()
     //__________________________________//
     /* Move camera left */
 	      case SDLK_LEFT:
-
-    //cameraPos.x -= 0.5;
-          R = mat4(cos(-yaw) , 0, sin(-yaw), 0,
-                 0        , 1, 0       , 0,
-                 -sin(-yaw), 0, cos(-yaw), 0,
-                 0       , 0, 0      , 1);
-
+          updateRotationMatrix(-yaw);
           cameraPos = R * cameraPos;
 		    break;
     //__________________________________//
     /* Move camera right */
 	      case SDLK_RIGHT:
 
-          R = mat4(cos(yaw) , 0, sin(yaw), 0,
-                 0        , 1, 0       , 0,
-                 -sin(yaw), 0, cos(yaw), 0,
-                 0       , 0, 0      , 1);
-
-          //cameraPos.x += 0.5;
+          updateRotationMatrix(yaw);
           cameraPos = R * cameraPos;
 		    break;
     //__________________________________//
