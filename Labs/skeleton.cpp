@@ -15,8 +15,8 @@ using glm::mat4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 256
+#define SCREEN_WIDTH 150
+#define SCREEN_HEIGHT 150
 #define FULLSCREEN_MODE false
 
 //struct containing inverse of shortest depth in variable zinv and co-ords (x,y)
@@ -67,7 +67,7 @@ vec3 currentColour;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 //Lighting globals
 vec4 lightPos(0,-1,-0.7,1.0);
-vec3 lightPower = 14.0f*vec3( 1, 1, 1 );
+vec3 lightPower = 15.0f*vec3( 1, 1, 1 );
 vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
 vec4 currentNormal;
 vec3 currentReflectance;
@@ -100,11 +100,12 @@ void VertexShader( Vertex &v, Pixel &p){
   //calculate rotated and transformed matrix pp
   pp = glm::inverse(R) * (v.position - cameraPos);
   //set projected pixel values in p
+  p.x = (f * pp.x) / pp.z + (SCREEN_WIDTH / 2);
+  p.y = (f * pp.y) / pp.z + (SCREEN_HEIGHT / 2);
   p.zinv = 1 / pp.z;
-  p.x = f * pp.x * p.zinv + (SCREEN_WIDTH / 2);
-  p.y = f * pp.y * p.zinv + (SCREEN_HEIGHT / 2);
   p.pos3D = v.position;
 }
+
 
 //fucntion draws a line between two given points in the given colour
 void DrawLineSDL(screen* screen, Pixel a, Pixel b, vec3 color){
@@ -122,22 +123,20 @@ void DrawLineSDL(screen* screen, Pixel a, Pixel b, vec3 color){
     float zinv = line[i].zinv;
     vec4 pos3D = line[i].pos3D;
     //check if co-ords are within image plane
-    if(x >= 0 && x < SCREEN_WIDTH && y >= 0 && y < SCREEN_HEIGHT){
+    if(x >= 0 && x <= SCREEN_WIDTH && y >= 0 && y <= SCREEN_HEIGHT){
       //if zinv is larger than currently stored pixel, the point is closer
       if(zinv > depthBuffer[y][x]){
         //Distance from light to 3D position
-        vec3 tempR = vec3(lightPos) - vec3(pos3D);
-        float distance = glm::length(tempR);
-        double temp = 4 * M_PI * distance * distance;
+        float r = glm::distance(pos3D, lightPos);
+        double temp = 4 * M_PI * r * r;
         float functionDenominator = 1 / temp;
         //find projection
         vec3 n = normalize(vec3(currentNormal));
-        vec3 r = normalize(tempR);
-        float projection = glm::dot(n, r);
+        float projection = glm::dot(n, normalize(vec3(r)));
         //Direct illumination from omni light source
         vec3 D = glm::max(projection, 0.f) * lightPower  * functionDenominator;
         //R = p*(D+N)
-        vec3 illumination = currentColour * (currentReflectance * (D + indirectLightPowerPerArea));
+        vec3 illumination = currentReflectance * (D + indirectLightPowerPerArea);
         //update depthBuffer value
         depthBuffer[y][x] = zinv;
         //draw pixel with the calculated illumination
@@ -159,16 +158,16 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result){
   vec3 step = vec3(bb-aa) / float(max(N-1,1));
   vec4 pStep = (b.pos3D - a.pos3D) / float(max(N-1,1));
   vec3 current( aa );
-  vec4 current3Dpos (a.pos3D);
+  vec4 currentP = a.pos3D;
 
   //loop through updating interpolated values in result array
   for( int i=0; i<N; ++i ){
     result[i].x = round(current.x);
     result[i].y = round(current.y);
     result[i].zinv = current.z;
-    result[i].pos3D = current3Dpos;
+    result[i].pos3D = currentP;
     current += step;
-    current3Dpos += pStep;
+    currentP += pStep;
   }
 }
 
@@ -219,8 +218,8 @@ void ComputePolygonRows(vector<Pixel>& vertexPixels,vector<Pixel>& leftPixels,ve
     difference.y = abs(vertexPixels[i].y - vertexPixels[j].y);
 
     //find number of rows between two vertices (different to ROWS)
-    //int intArraySize = abs(vertexPixels[indireci].y - vertexPixels[j].y) + 1;
-    int intArraySize = glm::max(difference.x, difference.y) + 1;
+    int intArraySize = abs(vertexPixels[i].y - vertexPixels[j].y) + 1;
+    //int intArraySize = glm::max(difference.x, difference.y) + 1;
 
     //interpolate between two projected vertices, filling results array
     vector<Pixel> line(intArraySize);
@@ -283,7 +282,6 @@ void Draw(screen* screen){
       depthBuffer[y][x] = 0;
     }
   }
-
   //draw all dem triangles
   for( uint32_t i=0; i<triangles.size(); ++i ){
     vector<Vertex> vertices(3);
@@ -293,8 +291,7 @@ void Draw(screen* screen){
     //setting global variables for current triangle
     currentColour = triangles[i].color;
     currentNormal = triangles[i].normal;
-    //setting the reflectance colour to white
-    currentReflectance = 1.0f * vec3(1,1,1);
+    currentReflectance = triangles[i].color; //vec3(0.5,0.5,0.5);
     DrawPolygon(screen, vertices);
   }
 }
@@ -345,9 +342,8 @@ bool Update()
         //__________________________________//
         /* Move camera left */
     	      case SDLK_LEFT:
-              cumYaw += yaw;
               updateRotationMatrix(yaw);
-
+              cumYaw += yaw;
               cameraPos = R * cameraPos;
     		    break;
         //__________________________________//

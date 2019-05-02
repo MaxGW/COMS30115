@@ -1,4 +1,4 @@
-      #include <iostream>
+#include <iostream>
 #include <glm/glm.hpp>
 #include <SDL.h>
 #include "SDLauxiliary.h"
@@ -6,6 +6,7 @@
 #include <stdint.h>
 #define USE_MATH_DEFINES
 #include <math.h>
+#include "omp.h"
 
 using namespace std;
 using glm::vec3;
@@ -239,6 +240,7 @@ void Draw(screen* screen){
   vec3 colour;
   Intersection closestIntersection;
 
+  #pragma omp parallel for schedule (static,10)
   for (int y=0; y<SCREEN_HEIGHT; y++){
 
     for(int x=0; x<SCREEN_WIDTH; x++){

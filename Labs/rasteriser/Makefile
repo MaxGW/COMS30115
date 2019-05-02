@@ -11,7 +11,7 @@ GLMDIR=../glm/
 EXEC=$(B_DIR)/$(FILE)
 
 # default build settings
-CC_OPTS=-c  -pipe -Wall -Wno-switch -ggdb -g3  -O3
+CC_OPTS=-c  -pipe -Wall -Wno-switch -ggdb -g  -O3
 LN_OPTS=
 CC=g++
 
